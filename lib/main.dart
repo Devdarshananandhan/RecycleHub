@@ -39,7 +39,8 @@ void main() async {
   
   // Initialize remaining services
   Get.lazyPut(() => ChatService(), fenix: true);
-  Get.lazyPut(() => PaymentService(), fenix: true);
+  // Initialize payment service to register Razorpay event handlers
+  await Get.putAsync(() => PaymentService().init());
   Get.lazyPut(() => DeliveryTrackingService(), fenix: true);
   
   runApp(const ReCycleHub());

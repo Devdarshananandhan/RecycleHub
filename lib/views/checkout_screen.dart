@@ -415,7 +415,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           amount: totalAmount,
           productName: widget.product.title,
           onSuccess: (paymentId) {
-            // Payment success is handled in PaymentService
+            // Reset loading state after successful payment
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+              });
+            }
           },
           onError: (error) {
             setState(() {

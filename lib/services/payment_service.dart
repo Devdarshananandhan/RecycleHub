@@ -9,6 +9,9 @@ class PaymentService extends GetxService {
   late Razorpay _razorpay;
   late AuthController _authController;
   late OrderController _orderController;
+  String? _currentOrderId;
+  Function(String)? _onSuccess;
+  Function(String)? _onError;
 
   Future<PaymentService> init() async {
     try {
@@ -26,6 +29,9 @@ class PaymentService extends GetxService {
 
   void dispose() {
     _razorpay.clear();
+    _currentOrderId = null;
+    _onSuccess = null;
+    _onError = null;
   }
 
   void startPayment({
@@ -35,6 +41,11 @@ class PaymentService extends GetxService {
     required Function(String) onSuccess,
     required Function(String) onError,
   }) {
+    // Keep context for callbacks
+    _currentOrderId = orderId;
+    _onSuccess = onSuccess;
+    _onError = onError;
+
     final user = _authController.currentUser.value;
     
     if (user == null) {
@@ -46,11 +57,11 @@ class PaymentService extends GetxService {
     final amountInPaise = (amount * 100).toInt();
 
     var options = {
-      'key': 'rzp_test_YOUR_KEY_HERE', // Replace with your actual Razorpay key
+      'key': 'rzp_test_YOUR_KEY_HERE', // TODO: Set your actual Razorpay key
       'amount': amountInPaise,
       'name': 'ReCycleHub',
       'description': 'Payment for $productName',
-      'order_id': orderId,
+      // Do NOT pass a mock order_id; integrate server-side order creation before enabling this.
       'prefill': {
         'contact': '9876543210', // Replace with user's phone if available
         'email': user.email,
@@ -70,10 +81,12 @@ class PaymentService extends GetxService {
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) {
     // Update order status to PAID
-    _orderController.updateOrderStatus(
-      response.orderId ?? '',
-      OrderStatus.PAID,
-    );
+    if (_currentOrderId != null && _currentOrderId!.isNotEmpty) {
+      _orderController.updateOrderStatus(
+        _currentOrderId!,
+        OrderStatus.PAID,
+      );
+    }
     
     Get.snackbar(
       'Payment Successful',
@@ -83,6 +96,16 @@ class PaymentService extends GetxService {
       colorText: Colors.white,
     );
     
+    // Notify caller
+    if (_onSuccess != null) {
+      _onSuccess!(response.paymentId ?? '');
+    }
+
+    // Clear transient state
+    _currentOrderId = null;
+    _onSuccess = null;
+    _onError = null;
+
     // Navigate to order management screen
     Get.toNamed('/orders');
   }
@@ -95,6 +118,11 @@ class PaymentService extends GetxService {
       backgroundColor: Colors.red,
       colorText: Colors.white,
     );
+
+    // Notify caller
+    if (_onError != null) {
+      _onError!(response.message ?? 'Payment failed');
+    }
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
